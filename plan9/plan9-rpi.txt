@@ -1,0 +1,448 @@
+Plan 9
+======
+
+Downloading the Latest Image
+----------------------------
+
+[Richard Miller updates the images][1] fairly regularly as he develops Rpi
+support. They're available over 9p (natch.)
+
+Install [plan9port][2] (pretty straightforward) and mount the sources:
+
+    mkdir ~/9p
+    9pfuse sources.9p.io ~/9p
+
+Look in `contrib/miller` and copy. It's slow (seems to be limited to 100 Kbps)
+so use a progress bar.
+
+    rsync -ah --progress 9pi.img.gz /home/myusername/filestore/iso/
+
+
+[1]: https://marc.info/?l=9fans&m=159015648319936&w=2
+[2]: https://github.com/9fans/plan9port
+
+
+Setup
+-----
+
+When booting for the first time you can use 'glenda' as the user and 'local' as
+the root. It loads up a bit of a tutorial on how to use Plan 9.
+
+
+### New User
+
+To [set up a new user][3], boot up Plan 9 but use 'none' as the user and create
+the user on the local fossil file system. `con` creates a console connection to
+the fossil console:
+
+	% con -l /srv/fscons
+	prompt:
+	main: uname myusername myusername
+	main: uname sys +myusername
+	main: uname adm +myusername
+
+Disconnect by typing `ctl-\` and then `q` at the `>>>` prompt. Reboot and use
+your new username. To create a user directory, run:
+
+	/sys/lib/newuser
+
+
+[3]: http://9p.io/wiki/plan9/Adding_a_new_user/index.html
+
+
+### Timezone
+
+Timezone:
+
+	cp /adm/timezone/GB-Eire /adm/timezone/local
+
+
+### Keyboard Character Map
+
+Keyboard character map follow [the guide][4]. Edit `/usr/myusername/lib/profile` and
+add a line before `exec rio`:
+
+	case terminal
+		...
+		cat /sys/lib/kbmap/uk > /dev/kbmap
+		exec rio
+
+
+[4]: http://9p.io/wiki/plan9/Setting_the_right_keyboard_map/index.html
+
+
+### Using the User as Host Owner (x386)
+
+To automatically boot using local and your new user (as the 'host owner'),
+first edit [plan9.ini][5], which is located on the FAT partition:
+
+	% 9fat:
+	% cd /n/9fat
+	% acme
+
+Add the lines:
+
+	user=myusername
+	nobootprompt=local!#S/sdC0/fossil
+
+
+[5]: http://9p.io/magic/man2html/8/plan9.ini
+
+
+### RPi Setup
+
+To automatically boot using local and your new user (as the 'host owner'),
+first edit `cmdline.txt`, which is located on the FAT partition. This seems to
+replace plan9.ini. Unlike plan9.ini, everything goes on one line:
+
+	% c:
+	% cd /n/c
+	% acme
+
+Add the lines:
+
+	readparts=1 nobootprompt=local user=myusername
+
+Note, 9front does away with the 'c:' script (and similar) Check the FQA.
+
+
+An Interlude - Some Basics
+--------------------------
+
+-   Shutdown:
+
+        fshalt
+
+    Then pull the power.
+
+-   Reboot:
+
+        fshalt -r
+
+    or
+
+        fshalt
+        Ctrl-Alt-Del or ctrl-t ctrl-t r
+
+    Running `reboot` didn't visibly sync the disk before rebooting which
+    worried me.
+
+-   Unix to Plan9 -- <http://9p.io/wiki/plan9/Unix_to_Plan_9_command_translation/index.html)>
+
+-   `Delete` is the same as `Ctrl-C`
+
+-   Automatically scroll a terminal - middle click and select `scroll`
+
+-   Mount the boot partition to edit `plan9.ini`:
+
+        9fat:
+        cd /n/9fat
+
+-   In the case of the rpi:
+
+        c:
+        cd /n/c
+
+-   Lots of boot config in `/rc/bin/termrc` and `termrc.local`.
+
+-   Remeber to put a blank line at the bottom of rc scripts or it'll complain.
+
+
+Setting up Network Configuration
+--------------------------------
+
+DHCP client:
+
+	ip/ipconfig
+	ndb/dns -r
+
+To make this permanent, uncomment the lines in `/rc/bin/termrc`:
+
+    if(! test -e /net/ipifc/0/ctl)
+        ip/ipconfig
+
+Test:
+
+    ip/ping 10.0.2.2
+
+Details should appear in the file:
+
+	/net/ndb
+
+
+Setting hostname (sysname)
+--------------------------
+
+You can see the current sysname by `cat /dev/sysname`. The easiest way to set
+the hostname is to add it to `plan9.ini` or `cmdline.txt`: 
+
+	sysname=myhostname
+
+
+Web Browser
+-----------
+
+	touch /usr/myusername/lib/webcookies
+	webfs
+	abaco
+
+Middle-click 'New', type the address into the blank bar and middle-click 'Get'.
+
+9front uses `mothra`. This may be slightly better.
+
+
+Look at the Wiki
+----------------
+
+Look at `/acme/wiki/guide`. It'll show how to run the local wiki which shows
+how to get the online version:
+
+    srv net!9p.io!wiki wiki /mnt/wiki
+
+Then to bring up the browser in acme run:
+
+    Wiki /mnt/wiki
+
+
+Look At What's Next
+-------------------
+
+The different roles a machine can have in a Plan 9 network are explained well
+here:
+
+<http://9p.io/wiki/plan9/Expanding_your_Grid/index.html>
+
+
+Turning a Terminal into a CPU and Authentication Server
+=======================================================
+
+Most of this is taken verbatim from:
+
+-   <http://9p.io/wiki/plan9/Configuring_a_Standalone_CPU_Server/index.html>
+-   <http://mirror.9grid.fr/mirror.9grid.fr/plan9-cpu-auth-server-howto.html>
+
+without a full understanding of exactly what I'm doing for all steps.
+
+
+Configuring a rpi as a Standalone CPU Server
+--------------------------------------------
+
+A terminal is pretty dumb. On it's own you can create local users but there is
+no authentication. You just log in using your username. You also can't connect
+to it or use it's resources from another machine. To do this you can set it up
+as a CPU Server. A combined CPU Server and Auth Server can share it's resources
+and be logged onto remotely, similar to how you would log onto a machine
+configured as SSH server. Basically you only really want to use a Terminal
+configuration for a pretty dumb terminal. Most workstations will want to be
+configured as a CPU server.
+
+By default a machine configured as a CPU server doesn't run the Terminal parts
+(i.e. the rio window system with mouse and keyboard). It should be pretty
+straightfoward to add those bits in. It's just some extra commands in the
+correct rc files. 
+
+Firstly create files containing machine-specific customisations. Make sure that
+you've set your hostname.
+
+	cd /cfg
+	mkdir $sysname
+	dircp example $sysname
+
+The order of startup appears to be
+
+-	`/rc/bin/cpurc` which calls...
+-	`/rc/bin/cpurc.local` (site specific startup) which returns
+-	`/rc/bin/cpurc` then sets the hostname then calls
+-	`/cfg/$sysname/cpurc` (cpu-specific startup)
+-	`/rc/bin/cpurc` then runs the majority of the script. It then calls
+-	`/cfg/$sysname/cpustart` (late startup)
+
+
+### Devices
+
+Bind any devices you need in `/rc/bin/cpurc.local` - mouse (m), draw (i) etc.
+Copy the bind lines from `termrc`:
+
+	for (i in f t m v L P u U '$' )
+		/bin/bind -a '#'^$i /dev >/dev/null >[2=1]
+
+
+### Network Config
+
+In `/cfg/$sysname/cpurc` uncomment out the `ip/ipconfig` line and adjust it. If
+you have DHCP you can probably just run `ip/ipconfig` on it's own.
+
+TODO: moving away from DHCP means you have to specify DNS servers somewhere.
+Probably in the ndb (see below).
+
+
+### Authentication Server
+
+Uncomment the two lines in `/rcc/bin/cpurc` to enable the authentication functions.
+
+	auth/keyfs -wp -m /mnt/keys /adm/keys >/dev/null >[2=1]
+	auth/cron >>/sys/log/cron >[2=1] &
+
+Also uncomment the lines that rename files:
+
+	if(! test -e /rc/bin/service.auth/tcp567) {
+	    mv /rc/bin/service.auth/authsrv.il566 ...
+	    mv /rc/bin/service.auth/authsrv.tcp567 ...
+	    mv /rc/bin/service/il566 ...
+	    mv /rc/bin/service/tcp567 ...
+	}	
+
+They're probably not all needed.
+
+Start the service in `/cfg/$sysname/cpustart` You'll have to create the file:
+
+	#!/bin/rc
+	# cpu-specific late startup
+
+	# Listen to the auth service
+	aux/listen -q -t /rc/bin/service.autth -d /rc/bin/service tcp
+
+
+### Input and Screen
+
+Copy from `/rc/bin/termrc` to `/cfg/$sysname/cpustart`: the sections on aux/mouse and aux/vga
+
+
+### rio
+
+TODO: add `exec rio` to the bottom of `cfg/$sysname/cpustart`
+
+
+### Network Database
+
+Edit `/lib/ndb/local`. Remove the existing auth line and add:
+
+	authdom=home auth=myhostname ip=192.168.x.x sysname=myhostname
+
+This uses the .home DNS domain
+
+Make sure you have the sysname set in `plan9.ini` or `cmdline.txt`.
+
+Check it with:
+
+	ndb/ipquery ip 192.168.x.x auth
+
+Uncomment the lines at the bottom of `/lib/ndb/auth`
+
+	hostid=bootes
+		uid=!sys uid=!adm uid=*
+
+Basically says bootes user (the host owner -- see below) can become any other
+users, given their credentials.
+
+
+### Hostowner User
+
+Setup a new 'host owner' user. Most of the config files assume it's a user
+called bootes. There's probably no reason you couldn't use your regular user
+name.
+
+	con /srv/fscons
+	prompt: uname bootes bootes
+	prompt: uname adm +bootes
+	prompt: uname sys +bootes
+	prompt: fsys main
+	main: create /active/cron/bootes bootes bootes d775
+	main: create /active/sys/log/cron bootes bootes a664
+
+Disconnect by typing `ctl-\` and then `q` at the `>>>` prompt.
+
+Remember: when logging in for the first time run /sys/lib/newuser.
+
+Check for boot errors:
+
+    cat /dev/kmesg
+
+A little bit hazy around this point TODO: get it clear when to run this.
+
+Run auth/keyfs and give a keyfile password.
+
+
+### Reboot, Finish Setting up Bootes and Set Other User Passwords
+
+Change config.txt so that the kernel version is `9picpu`.
+
+Change cmdline.txt so that it has the entries from cmdline-cpu.txt i.e. the
+nvram option
+
+
+Check out `booting(8)`, `boot(8)`, `init(8)`
+
+	authid: bootes
+	authdom: home
+	auth password: <bootes' password>
+	secstore password: <enter a new password>
+
+The next time you boot you won't be prompted.
+
+Give users a password:
+
+	auth/changeuser bootes
+	auth/changeuser myusername
+
+After the next reboot you aren't prompted for a user name or password again.
+TODO: work out how you log on as a user other than bootes locally.
+
+Remember to run `/sys/lib/newuser` the first time you log in as Bootes.
+
+
+### Logging in remotely
+
+Install drawterm -- plenty of distros package it -- and run
+
+	drawterm -a 192.168.x.x -c 192.168.x.x -u myusername
+
+
+### Useful debug
+
+	netstat -n
+
+Check for boot errors:
+
+    cat /dev/kmesg
+
+
+Stuff to look at
+================
+
+Example configs for cpurc and termrc can be found in `/cfg/example`
+
+
+Acme
+====
+
+-	Button 1 for selecting
+-	Button 2 (middle) execute
+-	Button 3 (right) search / load
+
+Chords:
+
+-	Select with 1 + middle = cut
+-	1 + right = paste
+-	1 + 2,3 = copy
+-	Select with 1, let go, then 2 + 1  on a command to use the selection as an argument
+
+Start a shell with `win`.
+
+Button 3 (load) can do all sorts of fun things using the plumber.
+
+
+Time Sync
+=========
+
+You can see current environment variables by looking in `/env`. Check TIMESYNCARGS.
+
+run 
+
+	TIMESYNCARGS=(-n 0.uk.pool.ntp.org)
+	aux/timesync $TIMESYNCARGS
+
+It looks like TIMESYNCARGS are set by `/rc/bin/termrc` which then calls
+`/rc/bin/termrc.local` that will promptly unset it. It basically does a test
+for the network but it isn't ready. So just comment out the TIMESYNCARGS lines.
+
