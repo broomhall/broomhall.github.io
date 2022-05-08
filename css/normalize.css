@@ -30,7 +30,7 @@
  * Remove the margin on nested lists in Chrome, Edge, and Safari.
  */
 
-:where(dl :is(dl, ol, ul), :is(ol, ul) dl) {
+:where(dl, ol, ul) :where(dl, ol, ul) {
   margin-block-end: 0;
   margin-block-start: 0;
 }
@@ -94,28 +94,16 @@
   font-size: 80%;
 }
 
-/* Embedded content
- * ========================================================================== */
-
-/**
- * Add the correct display in iOS 4-7.
- */
-
-:where(audio:not([controls])) {
-  display: none;
-  height: 0;
-}
-
 /* Tabular data
  * ========================================================================== */
 
 /**
- * 1. Correct table border color inheritance in all Chrome, Edge, and Safari.
+ * 1. Correct table border color in Chrome, Edge, and Safari.
  * 2. Remove text indentation from table contents in Chrome, Edge, and Safari.
  */
 
 :where(table) {
-  border-color: inherit; /* 1 */
+  border-color: currentColor; /* 1 */
   text-indent: 0; /* 2 */
 }
 
@@ -184,7 +172,8 @@
  * Correct the cursor style of increment and decrement buttons in Safari.
  */
 
-:where(input::-webkit-inner-spin-button, input::-webkit-outer-spin-button) {
+::-webkit-inner-spin-button,
+::-webkit-outer-spin-button {
   height: auto;
 }
 
@@ -192,7 +181,7 @@
  * Correct the text style of placeholders in Chrome, Edge, and Safari.
  */
 
-:where(input::-webkit-input-placeholder) {
+::-webkit-input-placeholder {
   color: inherit;
   opacity: 0.54;
 }
@@ -201,7 +190,7 @@
  * Remove the inner padding in Chrome, Edge, and Safari on macOS.
  */
 
-:where(input[type="search" i]::-webkit-search-decoration) {
+::-webkit-search-decoration {
   -webkit-appearance: none;
 }
 
@@ -210,7 +199,7 @@
  * 2. Change font properties to `inherit` in Safari.
  */
 
-:where(input[type="file" i]::-webkit-file-upload-button) {
+::-webkit-file-upload-button {
   -webkit-appearance: button; /* 1 */
   font: inherit; /* 2 */
 }
@@ -219,7 +208,7 @@
  * Remove the inner border and padding of focus outlines in Firefox.
  */
 
-:where(:is(button, input:is([type="button" i], [type="color" i], [type="reset" i], [type="submit" i]))::-moz-focus-inner) {
+:where(button, input:is([type="button" i], [type="color" i], [type="reset" i], [type="submit" i]))::-moz-focus-inner {
   border-style: none;
   padding: 0;
 }
@@ -228,7 +217,7 @@
  * Restore the focus outline styles unset by the previous rule in Firefox.
  */
 
-:where(:is(button, input:is([type="button" i], [type="color" i], [type="reset" i], [type="submit" i])):-moz-focusring) {
+:where(button, input:is([type="button" i], [type="color" i], [type="reset" i], [type="submit" i]))::-moz-focusring {
   outline: 1px dotted ButtonText;
 }
 
@@ -252,7 +241,6 @@
   border: solid;
   color: black;
   height: -moz-fit-content;
-  height: -webkit-fit-content;
   height: fit-content;
   left: 0;
   margin: auto;
@@ -260,7 +248,6 @@
   position: absolute;
   right: 0;
   width: -moz-fit-content;
-  width: -webkit-fit-content;
   width: fit-content;
 }
 
